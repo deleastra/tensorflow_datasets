@@ -47,6 +47,9 @@ _DESCRIPTION = (
     f"There are {_NUM_CORRUPT_IMAGES} corrupted images that are dropped."
 )
 
+# Regex pattern to match pet image files across all operating systems
+# [\\/] matches both forward slash (Unix/Linux/macOS) and backslash (Windows)
+# This ensures cross-platform compatibility for path matching
 _NAME_RE = re.compile(r"^PetImages[\\/](Cat|Dog)[\\/]\d+\.jpg$")
 
 
@@ -95,7 +98,10 @@ class CatsVsDogs(tfds.core.GeneratorBasedBuilder):
     """Generate Cats vs Dogs images and labels given a directory path."""
     num_skipped = 0
     for fname, fobj in archive:
+      # Normalize path for OS-specific operations (matching, display)
       norm_fname = os.path.normpath(fname)
+
+      # Test regex against normalized path for cross-platform compatibility
       res = _NAME_RE.match(norm_fname)
       if not res:  # README file, ...
         continue
@@ -113,10 +119,13 @@ class CatsVsDogs(tfds.core.GeneratorBasedBuilder):
       img_recoded = tf.io.encode_jpeg(img_tensor)
 
       # Converting the recoded image back into a zip file container.
+      # Always use forward slashes for zip file paths (ZIP standard requires this)
+      # This ensures compatibility across all operating systems
+      zip_fname = fname.replace(os.sep, '/') if os.sep != '/' else fname
       buffer = io.BytesIO()
       with zipfile.ZipFile(buffer, "w") as new_zip:
-        new_zip.writestr(norm_fname, img_recoded.numpy())
-      new_fobj = zipfile.ZipFile(buffer).open(norm_fname)
+        new_zip.writestr(zip_fname, img_recoded.numpy())
+      new_fobj = zipfile.ZipFile(buffer).open(zip_fname)
 
       record = {
           "image": new_fobj,
